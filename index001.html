@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Delivery Man In Fog</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: sans-serif;
+        }
+
+        #ui {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            color: white;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            font-size: 16px;
+            z-index: 10;
+        }
+
+        #card {
+            position: fixed;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            background: #333;
+            color: white;
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            user-select: none;
+            font-size: 18px;
+            transition: transform 0.3s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="ui">
+        <span id="position">位置: (0, 0)</span> |
+        <span id="time">剩余时间: 20</span>
+    </div>
+    <div id="card">卡片加载中...</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@7/dist/pixi.min.js"></script>
+    <script>
+        const app = new PIXI.Application({
+            width: window.innerWidth,
+            height: window.innerHeight,
+            backgroundColor: 0x222222,
+            resolution: window.devicePixelRatio || 1,
+            autoDensity: true,
+        });
+        document.body.appendChild(app.view);
+
+        const tileSize = 64;
+        const mapSize = 8;
+        const mapSymbols = [
+            ['.', '.', '.', '.', '.', '.', '.', '.'],
+            ['.', 'F', 'T', 'M', 'M', 'T', 'F', '.'],
+            ['.', '.', 'F', '.', '.', 'F', '.', '.'],
+            ['.', 'M', '.', '.', '.', '.', 'M', '.'],
+            ['.', 'M', '.', '.', '.', '.', 'M', '.'],
+            ['.', '.', 'F', '.', '.', 'F', '.', '.'],
+            ['.', 'F', 'T', 'M', 'M', 'T', 'F', '.'],
+            ['.', '.', '.', '.', '.', '.', '.', '.'],
+        ];
+
+        const units = [];
+        const baseTileUrl = './assets/base.png';
+        const unitTextures = { driver: './assets/soldier001.png' };
+        const overlayTexturesMap = {
+            'F': './assets/treePines.png',
+            'T': './assets/towerTall.png',
+            'M': './assets/rocks.png',
+        };
+
+        const mapContainer = new PIXI.Container();
+        app.stage.addChild(mapContainer);
+
+        const toLoad = [
+            baseTileUrl,
+            unitTextures.driver,
+            ...Object.values(overlayTexturesMap)
+        ];
+
+        const gameState = {
+            pos: { row: 0, col: 0 },
+            time: 20,
+        };
+
+        const cards = [
+            {
+                text: "前方岔路口",
+                left: { dx: -2, dy: 0, result: "你向左走两格。" },
+                right: { dx: 2, dy: 0, result: "你向右走两格。" }
+            },
+            {
+                text: "发现小道",
+                left: { dx: 0, dy: -1, result: "你向上走一步。" },
+                right: { dx: 0, dy: 1, result: "你向下走一步。" }
+            },
+            // {
+            //     text: "石头阻挡",
+            //     left: { dx: -1, dy: 0, result: "你。" },
+            //     right: { dx: 1, dy: 0, result: "你尝试右边冲过去。" }
+            // },
+        ];
+        let cardIndex = 0;
+
+        function updateStatusText() {
+            document.getElementById('position').innerText = `位置: (${gameState.pos.row}, ${gameState.pos.col})`;
+            document.getElementById('time').innerText = `剩余时间: ${gameState.time}`;
+        }
+
+        function loadNextCard() {
+            const card = cards[cardIndex % cards.length];
+            document.getElementById('card').innerText =
+                `🃏 ${card.text}\n👈 左滑: ${card.left.result}\n👉 右滑: ${card.right.result}`;
+        }
+
+        function handleCardChoice(direction) {
+            const card = cards[cardIndex % cards.length];
+            const choice = direction === 'left' ? card.left : card.right;
+
+            const driver = units.find(u => u.type === 'driver');
+            let { row, col } = gameState.pos;
+            let newRow = Math.max(0, Math.min(mapSize - 1, row + (choice.dy || 0)));
+            let newCol = Math.max(0, Math.min(mapSize - 1, col + (choice.dx || 0)));
+
+            driver.sprite.x = newCol * tileSize;
+            driver.sprite.y = newRow * tileSize;
+            gameState.pos = { row: newRow, col: newCol };
+            gameState.time -= 1;
+
+            updateStatusText();
+            cardIndex++;
+            loadNextCard();
+        }
+
+        const cardDiv = document.getElementById('card');
+        let startX = 0;
+
+        // cardDiv.addEventListener('touchstart', e => startX = e.touches[0].clientX);
+        // cardDiv.addEventListener('touchend', e => {
+        //   const endX = e.changedTouches[0].clientX;
+        //   const dx = endX - startX;
+        //   if (Math.abs(dx) > 30) handleCardChoice(dx > 0 ? 'right' : 'left');
+        // });
+
+        // cardDiv.addEventListener('mousedown', e => startX = e.clientX);
+        // cardDiv.addEventListener('mouseup', e => {
+        //   const dx = e.clientX - startX;
+        //   if (Math.abs(dx) > 30) handleCardChoice(dx > 0 ? 'right' : 'left');
+        // });
+
+        cardDiv.addEventListener('click', (e) => {
+            const rect = cardDiv.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+
+            if (x < rect.width / 2) {
+                handleCardChoice('left');
+            } else {
+                handleCardChoice('right');
+            }
+        });
+
+
+        PIXI.Assets.load(toLoad).then(resources => {
+            const baseTexture = resources[baseTileUrl];
+            for (let y = 0; y < 2; y++) {
+                for (let x = 0; x < 2; x++) {
+                    const sprite = new PIXI.Sprite(baseTexture);
+                    sprite.width = tileSize * 4;
+                    sprite.height = tileSize * 4;
+                    sprite.x = x * tileSize * 4;
+                    sprite.y = y * tileSize * 4;
+                    mapContainer.addChild(sprite);
+                }
+            }
+
+            for (let row = 0; row < mapSize; row++) {
+                for (let col = 0; col < mapSize; col++) {
+                    const sym = mapSymbols[row][col];
+                    if (sym === '.' || !overlayTexturesMap[sym]) continue;
+                    const texture = resources[overlayTexturesMap[sym]];
+                    const sprite = new PIXI.Sprite(texture);
+                    sprite.width = tileSize;
+                    sprite.height = tileSize;
+                    sprite.x = col * tileSize;
+                    sprite.y = row * tileSize;
+                    mapContainer.addChild(sprite);
+                }
+            }
+
+            const driverTexture = resources[unitTextures.driver];
+            const sprite = new PIXI.Sprite(driverTexture);
+            sprite.width = tileSize;
+            sprite.height = tileSize;
+            sprite.x = 0;
+            sprite.y = 0;
+            mapContainer.addChild(sprite);
+            units.push({ sprite, row: 0, col: 0, type: 'driver' });
+
+            centerMap();
+            updateStatusText();
+            loadNextCard();
+        });
+
+        function centerMap() {
+            mapContainer.x = (app.screen.width - tileSize * mapSize) / 2;
+            mapContainer.y = (app.screen.height - tileSize * mapSize) / 2;
+        }
+
+        window.addEventListener('resize', () => {
+            app.renderer.resize(window.innerWidth, window.innerHeight);
+            centerMap();
+        });
+    </script>
+</body>
+
+</html>

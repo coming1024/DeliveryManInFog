@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Delivery Man In Fog</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@7/dist/pixi.min.js"></script>
+    </script>
+    <script>
+        const app = new PIXI.Application({
+            width: window.innerWidth,
+            height: window.innerHeight,
+            backgroundColor: 0x222222,
+            resolution: window.devicePixelRatio || 1,
+            autoDensity: true,
+        });
+        document.body.appendChild(app.view);
+
+        //define map
+        const tileSize = 64;
+        const mapSize = 8;
+        const mapSymbols = [
+            ['.', '.', '.', '.', '.', '.', '.', '.'],
+            ['.', 'F', 'T', 'M', 'M', 'T', 'F', '.'],
+            ['.', '.', 'F', '.', '.', 'F', '.', '.'],
+            ['.', 'M', '.', '.', '.', '.', 'M', '.'],
+            ['.', 'M', '.', '.', '.', '.', 'M', '.'],
+            ['.', '.', 'F', '.', '.', 'F', '.', '.'],
+            ['.', 'F', 'T', 'M', 'M', 'T', 'F', '.'],
+            ['.', '.', '.', '.', '.', '.', '.', '.'],
+        ];
+
+        //import assets
+        const units = []; // Array of unit sprites with metadata
+        const baseTileUrl = './assets/base.png';
+        const unitTextures = {
+            driver: './assets/soldier001.png',
+        };
+        const overlayTexturesMap = {
+            'F': './assets/treePines.png',
+            'T': './assets/towerTall.png',
+            'M': './assets/rocks.png',
+        };
+
+        const mapContainer = new PIXI.Container();
+        app.stage.addChild(mapContainer);
+
+        const toLoad = [baseTileUrl, ...Object.values(unitTextures), ...Object.values(overlayTexturesMap)];
+
+        //game logic
+        PIXI.Assets.load(toLoad).then(resources => {
+            const baseTexture = resources[baseTileUrl];
+            for (let y = 0; y < 2; y++) {
+                for (let x = 0; x < 2; x++) {
+                    const sprite = new PIXI.Sprite(baseTexture);
+                    sprite.width = tileSize * 4;
+                    sprite.height = tileSize * 4;
+                    sprite.x = x * tileSize * 4;
+                    sprite.y = y * tileSize * 4;
+                    mapContainer.addChild(sprite);
+                }
+            }
+
+            for (let row = 0; row < mapSize; row++) {
+                for (let col = 0; col < mapSize; col++) {
+                    const sym = mapSymbols[row][col];
+                    if (sym === '.' || !overlayTexturesMap[sym]) continue;
+
+                    const texture = resources[overlayTexturesMap[sym]];
+                    const sprite = new PIXI.Sprite(texture);
+                    sprite.width = tileSize;
+                    sprite.height = tileSize;
+                    sprite.x = col * tileSize;
+                    sprite.y = row * tileSize;
+                    mapContainer.addChild(sprite);
+                }
+            }
+
+            addUnit('driver', 0, 0, resources);
+
+
+            centerMap();
+        });
+
+        function addUnit(type, row, col, resources) {
+            const texture = resources[unitTextures[type]];
+            const sprite = new PIXI.Sprite(texture);
+            sprite.width = tileSize;
+            sprite.height = tileSize;
+            sprite.x = col * tileSize;
+            sprite.y = row * tileSize;
+            sprite.interactive = true;
+            sprite.buttonMode = true;
+
+            const unit = { sprite, row, col, type };
+            units.push(unit);
+            mapContainer.addChild(sprite);
+        }
+
+
+        function centerMap() {
+            mapContainer.x = (app.screen.width - tileSize * mapSize) / 2;
+            mapContainer.y = (app.screen.height - tileSize * mapSize) / 2;
+        }
+
+        window.addEventListener('resize', () => {
+            app.renderer.resize(window.innerWidth, window.innerHeight);
+            mapContainer.x = (app.screen.width - tileSize * mapSize) / 2;
+            mapContainer.y = (app.screen.height - tileSize * mapSize) / 2;
+        });
+    </script>
+
+</body>
+
+</html>
