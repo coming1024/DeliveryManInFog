@@ -75,6 +75,8 @@
         const units = [];
         const baseTileUrl = './assets/base.png';
         const unitTextures = { driver: './assets/soldier001.png' };
+        const fogTextureUrl = './assets/fog.png';
+
         const overlayTexturesMap = {
             'F': './assets/treePines.png',
             'T': './assets/towerTall.png',
@@ -82,12 +84,19 @@
         };
 
         const mapContainer = new PIXI.Container();
+        const fogLayer = new PIXI.Container(); // 新建一层
+        // app.stage.addChild(fogLayer); // 加在最上面
+        // mapContainer.addChild(fogLayer);
+        // mapContainer.setChildIndex(fogLayer, 0);
+        const fogTiles = []; // 存储每个格子的雾 Sprite
         app.stage.addChild(mapContainer);
+        app.stage.addChild(fogLayer); // 加在最上面
 
         const toLoad = [
             baseTileUrl,
             unitTextures.driver,
-            ...Object.values(overlayTexturesMap)
+            fogTextureUrl,
+            ...Object.values(overlayTexturesMap),
         ];
 
         const gameState = {
@@ -142,7 +151,43 @@
             updateStatusText();
             cardIndex++;
             loadNextCard();
+            updateFog(); // 初始时刷新视野
         }
+
+        function updateFog() {
+            const { row, col } = gameState.pos;
+
+            // 所有先设为可见 false（全遮住）
+            for (let r = 0; r < mapSize; r++) {
+                for (let c = 0; c < mapSize; c++) {
+                    fogTiles[r][c].visible = true;
+                }
+            }
+
+            // 当前格和上下左右格设为“可见”＝隐藏雾
+            const directions = [
+                { dr: 0, dc: 0 },  // 自己
+                { dr: -1, dc: 0 }, // 上
+                { dr: -1, dc: -1 }, // 上
+                { dr: 1, dc: 0 },  // 下
+                { dr: 1, dc: 1 },  // 下
+                { dr: 0, dc: -1 }, // 左
+                { dr: -1, dc: -1 }, // 左
+                { dr: 0, dc: 1 },  // 右
+                { dr: 1, dc: 1 },  // 右
+                { dr: 1, dc: -1 },  // 右
+                { dr: -1, dc: 1 },  // 右
+            ];
+
+            for (const dir of directions) {
+                const r = row + dir.dr;
+                const c = col + dir.dc;
+                if (r >= 0 && r < mapSize && c >= 0 && c < mapSize) {
+                    fogTiles[r][c].visible = false; // 隐藏雾
+                }
+            }
+        }
+
 
         const cardDiv = document.getElementById('card');
         let startX = 0;
@@ -199,6 +244,22 @@
                 }
             }
 
+            const fogTexture = resources[fogTextureUrl];
+            for (let row = 0; row < mapSize; row++) {
+                fogTiles[row] = [];
+                for (let col = 0; col < mapSize; col++) {
+                    const fog = new PIXI.Sprite(fogTexture);
+                    // fog.alpha = 0.9;
+                    fog.width = tileSize;
+                    fog.height = tileSize;
+                    fog.x = col * tileSize;
+                    fog.y = row * tileSize;
+                    fogLayer.addChild(fog);
+                    fogTiles[row][col] = fog;
+                }
+            }
+
+
             const driverTexture = resources[unitTextures.driver];
             const sprite = new PIXI.Sprite(driverTexture);
             sprite.width = tileSize;
@@ -211,11 +272,14 @@
             centerMap();
             updateStatusText();
             loadNextCard();
+            updateFog(); // 初始时刷新视野
         });
 
         function centerMap() {
             mapContainer.x = (app.screen.width - tileSize * mapSize) / 2;
             mapContainer.y = (app.screen.height - tileSize * mapSize) / 2;
+            fogLayer.x = (app.screen.width - tileSize * mapSize) / 2;
+            fogLayer.y = (app.screen.height - tileSize * mapSize) / 2;
         }
 
         window.addEventListener('resize', () => {
